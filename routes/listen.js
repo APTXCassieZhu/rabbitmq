@@ -16,28 +16,32 @@ const opt = { credentials: require('amqplib').credentials.plain('admin', 'admin'
 //  console.log("Usage: listen.js [key array]");
 //  process.exit(1);
 //}
+router.post('/', jsonParser, function(req, res) {
+  amqp.connect('amqp://130.245.170.104', opt, function(err, conn) {
+    conn.createChannel(function(err, ch) {
+      var ex = 'hw3';
 
-amqp.connect('amqp://130.245.170.104', opt, function(err, conn) {
-  conn.createChannel(function(err, ch) {
-    var ex = 'hw3';
+      ch.assertExchange(ex, 'direct', {durable: false});
 
-    ch.assertExchange(ex, 'direct', {durable: true});
+      ch.assertQueue('', {exclusive: true}, function(err, q) {
+	data = req.body;
+        keys = data.keys;
+        console.log(' [*] Waiting for logs. To exit press CTRL+C');
+	console.log("keys:  "+keys)
+        keys.forEach(function(severity) {
+          ch.bindQueue(q.queue, ex, severity);
+        });
 
-
-    ch.assertQueue('', {exclusive: true}, function(err, q) {
-      console.log(' [*] Waiting for logs. To exit press CTRL+C');
-
-      args.forEach(function(severity) {
-        ch.bindQueue(q.queue, ex, severity);
+        ch.consume(q.queue, function(msg) {
+          console.log(" [x] routing-key %s: '%s'", msg.fields.routingKey, msg.content.toString());
+          // returns message as { msg: }
+          res.json({"msg":msg.content.toString()});
+          //}, {noAck: true});
+	});
       });
-
-      ch.consume(q.queue, function(msg) {
-	msg = JSON.parse(msg.content);
-        console.log(" [x] routing-key: '%s'", msg);
-      }, {noAck: true});
     });
   });
 });
-
 module.exports = router;
+
 
